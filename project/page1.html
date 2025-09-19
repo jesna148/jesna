@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Campus Clubs & Event Management</title>
+  
+  <!-- Google Fonts + Font Awesome -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Poppins', sans-serif;
+      background-color: #f3f3f3;
+      color: #333;
+    }
+
+    header {
+      background: linear-gradient(135deg, #b721ff, #21d4fd);
+      color: white;
+      padding: 25px 20px;
+      text-align: center;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 2.2rem;
+    }
+
+    nav {
+      display: flex;
+      justify-content: center;
+      background-color: #1e1e1e;
+      flex-wrap: wrap;
+    }
+
+    nav a {
+      color: white;
+      padding: 14px 20px;
+      text-decoration: none;
+      transition: background-color 0.3s ease;
+      font-weight: 500;
+    }
+
+    nav a:hover {
+      background-color: #444;
+    }
+
+    .hero {
+      background: url('https://static.vecteezy.com/system/resources/thumbnails/053/915/481/small_2x/attendees-gather-in-a-large-event-hall-illuminated-by-vibrant-lights-eagerly-awaiting-a-performance-the-atmosphere-buzzes-with-anticipation-as-shadows-dance-across-the-audience-photo.jpg') no-repeat center center/cover;
+      height: 70vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      text-align: center;
+      padding: 20px;
+      box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.4);
+    }
+
+    .hero h1 {
+      font-size: 3rem;
+      margin-bottom: 10px;
+    }
+
+    .hero p {
+      font-size: 1.2rem;
+      font-weight: 300;
+    }
+
+    .section {
+      padding: 60px 20px;
+      background-color: #fdfdfd;
+      text-align: center;
+    }
+
+    .section h2 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: #222;
+      margin-bottom: 40px;
+      position: relative;
+    }
+
+    .section h2::after {
+      content: '';
+      width: 80px;
+      height: 4px;
+      background-color: #4caf50;
+      display: block;
+      margin: 10px auto 0;
+      border-radius: 2px;
+    }
+
+    .cards {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      flex-wrap: wrap;
+    }
+
+    .card {
+      background-color: white;
+      border-radius: 20px;
+      padding: 30px 25px;
+      width: 280px;
+      box-shadow: 0 12px 25px rgba(0,0,0,0.08);
+      transition: all 0.3s ease;
+      text-align: center;
+    }
+
+    .card:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+    }
+
+    .card i {
+      font-size: 40px;
+      margin-bottom: 15px;
+      color: #4caf50;
+    }
+
+    .card h3 {
+      font-size: 1.4rem;
+      margin-bottom: 10px;
+      color: #222;
+    }
+
+    .card p {
+      font-size: 0.95rem;
+      color: #666;
+      margin-bottom: 20px;
+    }
+
+    .card a {
+      text-decoration: none;
+      color: #4caf50;
+      font-weight: 600;
+      font-size: 1rem;
+      transition: color 0.3s ease;
+    }
+
+    .card a:hover {
+      color: #388e3c;
+      text-decoration: underline;
+    }
+
+    footer {
+      background-color: #1e1e1e;
+      color: white;
+      text-align: center;
+      padding: 20px;
+      font-size: 0.95rem;
+      margin-top: 40px;
+    }
+
+    @media (max-width: 768px) {
+      .hero h1 {
+        font-size: 2rem;
+      }
+
+      .cards {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .card {
+        width: 90%;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Header -->
+  <header>
+    <h1>Campus Clubs & Event Management</h1>
+  </header>
+
+  <!-- Navigation -->
+  <nav>
+    <a href="page1.html">Home</a>
+    <a href="clubs.php">Clubs</a>
+    <a href="#">Events</a>
+    <a href="register.php">Signup</a>
+  </nav>
+
+  <!-- Hero Section -->
+  <div class="hero">
+    <div>
+      <h1>Welcome to Campus Clubs</h1>
+      <p>Join. Connect. Celebrate. Lead your campus life!</p>
+    </div>
+  </div>
+
+  <!-- Explore Section -->
+  <div class="section">
+    <h2>Explore Campus Life</h2>
+    <div class="cards">
+      <div class="card">
+        <i class="fas fa-users"></i>
+        <h3>Our Clubs</h3>
+        <p>Discover technical, cultural, sports, and literary clubs.</p>
+        <a href="clubs.php">View Clubs</a>
+      </div>
+      <div class="card">
+        <i class="fas fa-calendar-alt"></i>
+        <h3>Upcoming Events</h3>
+        <p>Stay updated with campus events and competitions.</p>
+        <a href="#">View Events</a>
+      </div>
+      <div class="card">
+        <i class="fas fa-user-plus"></i>
+        <h3>Join Now</h3>
+        <p>Create an account and become a part of our community.</p>
+        <a href="register.php">Sign Up</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    &copy; 2025 Campus Clubs & Event Management. All rights reserved.
+  </footer>
+
+</body>
+</html>

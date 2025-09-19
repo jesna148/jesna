@@ -1,0 +1,55 @@
+<?php
+session_start();
+include 'db_connection.php';
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $email = trim($_POST['email']);
+    $password = trim($_POST['password']);
+
+    // Check if email already exists
+    $stmt_check = $conn->prepare("SELECT id FROM users WHERE email = ?");
+    $stmt_check->bind_param("s", $email);
+    $stmt_check->execute();
+    if ($stmt_check->get_result()->num_rows > 0) {
+        echo "Email already registered.";
+        exit();
+    }
+    $stmt_check->close();
+
+    // Generate unique club code
+    $club_code = getUniqueClubCode($conn);
+
+    // Store with plain password
+    $stmt = $conn->prepare("INSERT INTO users (email, password, role, club_code) VALUES (?, ?, 'club_leader', ?)");
+    $stmt->bind_param("sss", $email, $password, $club_code);
+    $stmt->execute();
+
+    echo "Registration successful! Your club code: " . $club_code;
+    $stmt->close();
+    $conn->close();
+}
+
+function getUniqueClubCode($conn) {
+    do {
+        $code = 'CLUB' . rand(10000, 99999);
+        $stmt = $conn->prepare("SELECT id FROM users WHERE club_code = ?");
+        $stmt->bind_param("s", $code);
+        $stmt->execute();
+        $exists = $stmt->get_result()->num_rows > 0;
+        $stmt->close();
+    } while ($exists);
+    return $code;
+}
+?>
+<html> 
+<!-- Registration form -->
+<form method="POST" action="">
+    <label>Email:</label>
+    <input type="email" name="email" required>
+    <br>
+    <label>Password:</label>
+    <input type="password" name="password" required>
+    <br>
+    <button type="submit">Register as Club Leader</button>
+</form>
+</html>

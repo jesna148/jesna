@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Add Event</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f6f8;
+    margin: 0;
+    padding: 20px;
+  }
+
+  .form-container {
+    max-width: 500px;
+    margin: 50px auto;
+    background-color: #fff;
+    padding: 30px 40px;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  }
+
+  h2 {
+    text-align: center;
+    color: #333;
+    margin-bottom: 20px;
+  }
+
+  label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+    color: #555;
+  }
+
+  input[type="text"],
+  input[type="date"],
+  input[type="time"],
+  textarea {
+    width: 100%;
+    padding: 10px 12px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+    font-size: 14px;
+    transition: border-color 0.3s;
+  }
+
+  input[type="text"]:focus,
+  input[type="date"]:focus,
+  input[type="time"]:focus,
+  textarea:focus {
+    border-color: #007BFF;
+    outline: none;
+  }
+
+  textarea {
+    resize: vertical;
+    min-height: 80px;
+  }
+
+  button {
+    width: 100%;
+    padding: 12px;
+    background-color: #9abcd3;
+    border: none;
+    border-radius: 4px;
+    color:#141416;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+
+  button:hover {
+    background-color:#53a4d3; 
+  }
+</style>
+</head>
+<body>
+
+<div class="form-container">
+  <h2>Add New Event</h2>
+  <form action="#" method="post">
+    <label for="eventName">Event Name</label>
+    <input type="text" id="eventName" name="eventName" placeholder="Enter event name" required />
+
+    <label for="date">Date</label>
+    <input type="date" id="date" name="date" required />
+
+    <label for="time">Time</label>
+    <input type="time" id="time" name="time" required />
+
+    <label for="venue">Venue</label>
+    <input type="text" id="venue" name="venue" placeholder="Enter venue" required />
+
+    <label for="description">Description</label>
+    <textarea id="description" name="description" placeholder="Enter a short description" required></textarea>
+
+    <button type="submit">Add Event</button>
+  </form>
+</div>
+
+</body>
+</html>

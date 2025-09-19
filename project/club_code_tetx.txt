@@ -1,0 +1,1563 @@
+<?php
+// =====================================================
+// 1. DATABASE SETUP (run this SQL first)
+// =====================================================
+/*
+
+-- Create database
+CREATE DATABASE campus_clubs;
+USE campus_clubs;
+
+-- Users table
+CREATE TABLE users (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    full_name VARCHAR(100) NOT NULL,
+    student_id VARCHAR(20) UNIQUE NOT NULL,
+    phone VARCHAR(15),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Clubs table
+CREATE TABLE clubs (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,
+    slug VARCHAR(100) UNIQUE NOT NULL,
+    image VARCHAR(255),
+    short_description TEXT,
+    full_description TEXT,
+    activities JSON,
+    meeting_time VARCHAR(100),
+    location VARCHAR(100),
+    contact_email VARCHAR(100),
+    created_by INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
+-- Club memberships table
+CREATE TABLE club_memberships (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    club_id INT NOT NULL,
+    role ENUM('member', 'admin', 'president') DEFAULT 'member',
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status ENUM('active', 'inactive', 'pending') DEFAULT 'pending',
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_membership (user_id, club_id)
+);
+
+-- Club events table
+CREATE TABLE club_events (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    club_id INT NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    description TEXT,
+    event_date DATETIME NOT NULL,
+    location VARCHAR(100),
+    created_by INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
+-- Insert sample data
+INSERT INTO clubs (name, slug, image, short_description, full_description, activities, meeting_time, location, contact_email) VALUES
+('Literary Club', 'literary', 'images/literary.jpg', 'A space for poetry, books, and creative writing.', 'Join our vibrant literary community where words come alive! We organize poetry slams, book discussions, creative writing workshops, and publishing opportunities.', '["Poetry Slams", "Book Reviews", "Creative Writing Workshops", "Literary Magazine Publishing", "Author Meetups"]', 'Every Friday, 4:00 PM - 6:00 PM', 'Library Conference Room', 'literary@campus.edu'),
+
+('Music Club', 'music', 'images/music.jpg', 'Explore instruments, vocals, and stage performances.', 'Unleash your musical talents with us! From classical to contemporary, our club welcomes all genres and skill levels.', '["Band Practice", "Solo Performances", "Music Theory Classes", "Recording Sessions", "Campus Concerts"]', 'Tuesday & Thursday, 5:30 PM - 7:30 PM', 'Music Room, Arts Building', 'music@campus.edu'),
+
+('Tech Club', 'tech', 'images/tech.jpg', 'For coders, inventors, and technology lovers.', 'Dive into the world of technology! Learn programming languages, work on innovative projects, participate in hackathons.', '["Coding Bootcamps", "Hackathons", "Tech Talks", "Project Development", "Industry Visits"]', 'Wednesday, 6:00 PM - 8:00 PM', 'Computer Lab 2', 'tech@campus.edu'),
+
+('Art Club', 'art', 'images/art.jpg', 'Unleash your creativity through painting, sketching, and crafts.', 'Express yourself through various art forms! Our club provides materials, guidance, and inspiration for all artistic endeavors.', '["Painting Workshops", "Sculpture Classes", "Art Exhibitions", "Craft Sessions", "Digital Art Training"]', 'Monday & Wednesday, 3:00 PM - 5:00 PM', 'Art Studio, Creative Building', 'art@campus.edu'),
+
+('Drama Club', 'drama', 'images/drama.jpg', 'Acting, theatre, and stage presence — perfect for performers.', 'Step into the spotlight! Our drama club is perfect for aspiring actors, directors, and theatre enthusiasts.', '["Play Productions", "Acting Workshops", "Improvisation Sessions", "Script Writing", "Theatre Trips"]', 'Saturday, 10:00 AM - 1:00 PM', 'Theatre Hall', 'drama@campus.edu'),
+
+('Sports Club', 'sports', 'images/sports.jpg', 'Promoting fitness, sportsmanship, and healthy competition.', 'Stay fit, compete, and build team spirit! Our sports club organizes various athletic activities and tournaments.', '["Football Matches", "Basketball Tournaments", "Fitness Training", "Inter-college Competitions", "Sports Events"]', 'Daily, 5:00 AM - 7:00 AM & 5:00 PM - 7:00 PM', 'Sports Complex', 'sports@campus.edu'),
+
+('Photography Club', 'photography', 'images/photography.jpg', 'Capture moments, learn editing, and explore visual storytelling.', 'Capture the world through your lens! Learn photography techniques, photo editing, and visual storytelling.', '["Photo Walks", "Editing Workshops", "Photography Exhibitions", "Nature Photography", "Portrait Sessions"]', 'Sunday, 2:00 PM - 5:00 PM', 'Media Lab & Outdoor Locations', 'photography@campus.edu'),
+
+('Environment Club', 'environment', 'images/environment.jpg', 'Raise awareness, go green, and lead eco-friendly initiatives.', 'Make a difference for our planet! Join our environmental initiatives including tree planting and recycling programs.', '["Tree Plantation Drives", "Recycling Programs", "Environmental Awareness Campaigns", "Clean-up Drives", "Sustainability Workshops"]', 'Saturday, 2:00 PM - 4:00 PM', 'Environmental Science Lab', 'environment@campus.edu');
+
+*/
+
+// =====================================================
+// 2. CONFIG FILE (config.php)
+// =====================================================
+?>
+
+<?php
+// config.php
+session_start();
+
+// Database configuration
+define('DB_HOST', 'localhost');
+define('DB_NAME', 'campus_clubs');
+define('DB_USER', 'root');
+define('DB_PASS', ''); // Change this to your MySQL password
+
+// Create database connection
+try {
+    $pdo = new PDO("mysql:host=".DB_HOST.";dbname=".DB_NAME.";charset=utf8mb4", DB_USER, DB_PASS);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+} catch(PDOException $e) {
+    die("Connection failed: " . $e->getMessage());
+}
+
+// Helper functions
+function isLoggedIn() {
+    return isset($_SESSION['user_id']);
+}
+
+function requireLogin() {
+    if (!isLoggedIn()) {
+        header('Location: login.php');
+        exit;
+    }
+}
+
+function getUserData($pdo, $user_id) {
+    $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+    $stmt->execute([$user_id]);
+    return $stmt->fetch();
+}
+
+function getClubMemberCount($pdo, $club_id) {
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM club_memberships WHERE club_id = ? AND status = 'active'");
+    $stmt->execute([$club_id]);
+    return $stmt->fetchColumn();
+}
+
+function isClubMember($pdo, $user_id, $club_id) {
+    $stmt = $pdo->prepare("SELECT status FROM club_memberships WHERE user_id = ? AND club_id = ?");
+    $stmt->execute([$user_id, $club_id]);
+    return $stmt->fetchColumn();
+}
+?>
+
+<?php
+// =====================================================
+// 3. LOGIN PAGE (login.php)
+// =====================================================
+?>
+
+<?php
+require_once 'config.php';
+
+$error = '';
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $username = trim($_POST['username']);
+    $password = $_POST['password'];
+    
+    if (!empty($username) && !empty($password)) {
+        $stmt = $pdo->prepare("SELECT id, username, password FROM users WHERE username = ? OR email = ?");
+        $stmt->execute([$username, $username]);
+        $user = $stmt->fetch();
+        
+        if ($user && password_verify($password, $user['password'])) {
+            $_SESSION['user_id'] = $user['id'];
+            $_SESSION['username'] = $user['username'];
+            header('Location: clubs.php');
+            exit;
+        } else {
+            $error = 'Invalid username or password';
+        }
+    } else {
+        $error = 'Please fill in all fields';
+    }
+}
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Campus Clubs</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .login-container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+        
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .login-header h1 {
+            color: #2575fc;
+            font-size: 2.2em;
+            margin-bottom: 10px;
+        }
+        
+        .login-header p {
+            color: #666;
+            font-size: 1em;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e1e1e1;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #2575fc;
+        }
+        
+        .login-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #2575fc, #00c9ff);
+            color: white;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+        
+        .login-btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .register-link {
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        .register-link a {
+            color: #2575fc;
+            text-decoration: none;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <h1>Welcome Back</h1>
+            <p>Sign in to access Campus Clubs</p>
+        </div>
+        
+        <?php if ($error): ?>
+        <div class="error"><?php echo htmlspecialchars($error); ?></div>
+        <?php endif; ?>
+        
+        <form method="POST">
+            <div class="form-group">
+                <label for="username">Username or Email</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            
+            <button type="submit" class="login-btn">Sign In</button>
+        </form>
+        
+        <div class="register-link">
+            <p>Don't have an account? <a href="register.php">Register here</a></p>
+        </div>
+    </div>
+</body>
+</html>
+
+<?php
+// =====================================================
+// 4. REGISTRATION PAGE (register.php)
+// =====================================================
+?>
+
+<?php
+require_once 'config.php';
+
+$error = '';
+$success = '';
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $username = trim($_POST['username']);
+    $email = trim($_POST['email']);
+    $password = $_POST['password'];
+    $confirm_password = $_POST['confirm_password'];
+    $full_name = trim($_POST['full_name']);
+    $student_id = trim($_POST['student_id']);
+    $phone = trim($_POST['phone']);
+    
+    // Validation
+    if (empty($username) || empty($email) || empty($password) || empty($full_name) || empty($student_id)) {
+        $error = 'Please fill in all required fields';
+    } elseif ($password !== $confirm_password) {
+        $error = 'Passwords do not match';
+    } elseif (strlen($password) < 6) {
+        $error = 'Password must be at least 6 characters';
+    } else {
+        // Check if username or email already exists
+        $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ? OR email = ? OR student_id = ?");
+        $stmt->execute([$username, $email, $student_id]);
+        
+        if ($stmt->fetch()) {
+            $error = 'Username, email, or student ID already exists';
+        } else {
+            // Insert new user
+            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+            $stmt = $pdo->prepare("INSERT INTO users (username, email, password, full_name, student_id, phone) VALUES (?, ?, ?, ?, ?, ?)");
+            
+            if ($stmt->execute([$username, $email, $hashed_password, $full_name, $student_id, $phone])) {
+                $success = 'Registration successful! You can now login.';
+            } else {
+                $error = 'Registration failed. Please try again.';
+            }
+        }
+    }
+}
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - Campus Clubs</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .register-container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 500px;
+        }
+        
+        .register-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .register-header h1 {
+            color: #2575fc;
+            font-size: 2.2em;
+            margin-bottom: 10px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e1e1e1;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #2575fc;
+        }
+        
+        .register-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #2575fc, #00c9ff);
+            color: white;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+        
+        .register-btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .success {
+            background: #efe;
+            color: #3c3;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .login-link {
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        .login-link a {
+            color: #2575fc;
+            text-decoration: none;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="register-container">
+        <div class="register-header">
+            <h1>Join Campus Clubs</h1>
+            <p>Create your account to get started</p>
+        </div>
+        
+        <?php if ($error): ?>
+        <div class="error"><?php echo htmlspecialchars($error); ?></div>
+        <?php endif; ?>
+        
+        <?php if ($success): ?>
+        <div class="success"><?php echo htmlspecialchars($success); ?></div>
+        <?php endif; ?>
+        
+        <form method="POST">
+            <div class="form-group">
+                <label for="full_name">Full Name *</label>
+                <input type="text" id="full_name" name="full_name" value="<?php echo htmlspecialchars($_POST['full_name'] ?? ''); ?>" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="username">Username *</label>
+                <input type="text" id="username" name="username" value="<?php echo htmlspecialchars($_POST['username'] ?? ''); ?>" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="email">Email *</label>
+                <input type="email" id="email" name="email" value="<?php echo htmlspecialchars($_POST['email'] ?? ''); ?>" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="student_id">Student ID *</label>
+                <input type="text" id="student_id" name="student_id" value="<?php echo htmlspecialchars($_POST['student_id'] ?? ''); ?>" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="phone">Phone Number</label>
+                <input type="tel" id="phone" name="phone" value="<?php echo htmlspecialchars($_POST['phone'] ?? ''); ?>">
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password *</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="confirm_password">Confirm Password *</label>
+                <input type="password" id="confirm_password" name="confirm_password" required>
+            </div>
+            
+            <button type="submit" class="register-btn">Create Account</button>
+        </form>
+        
+        <div class="login-link">
+            <p>Already have an account? <a href="login.php">Sign in here</a></p>
+        </div>
+    </div>
+</body>
+</html>
+
+<?php
+// =====================================================
+// 5. MAIN CLUBS PAGE (clubs.php)
+// =====================================================
+?>
+
+<?php
+require_once 'config.php';
+requireLogin();
+
+// Handle AJAX requests
+if (isset($_POST['action'])) {
+    header('Content-Type: application/json');
+    
+    if ($_POST['action'] == 'get_club_details') {
+        $club_id = (int)$_POST['club_id'];
+        
+        $stmt = $pdo->prepare("
+            SELECT c.*, 
+                   (SELECT COUNT(*) FROM club_memberships cm WHERE cm.club_id = c.id AND cm.status = 'active') as member_count
+            FROM clubs c 
+            WHERE c.id = ?
+        ");
+        $stmt->execute([$club_id]);
+        $club = $stmt->fetch();
+        
+        if ($club) {
+            $club['activities'] = json_decode($club['activities'], true);
+            $club['is_member'] = isClubMember($pdo, $_SESSION['user_id'], $club_id);
+            echo json_encode($club);
+        } else {
+            echo json_encode(['error' => 'Club not found']);
+        }
+        exit;
+    }
+    
+    if ($_POST['action'] == 'join_club') {
+        $club_id = (int)$_POST['club_id'];
+        $user_id = $_SESSION['user_id'];
+        
+        // Check if already a member
+        if (!isClubMember($pdo, $user_id, $club_id)) {
+            $stmt = $pdo->prepare("INSERT INTO club_memberships (user_id, club_id, status) VALUES (?, ?, 'pending')");
+            if ($stmt->execute([$user_id, $club_id])) {
+                echo json_encode(['success' => 'Join request submitted successfully!']);
+            } else {
+                echo json_encode(['error' => 'Failed to submit join request']);
+            }
+        } else {
+            echo json_encode(['error' => 'You are already a member or have a pending request']);
+        }
+        exit;
+    }
+}
+
+// Fetch all clubs
+$stmt = $pdo->prepare("
+    SELECT c.*, 
+           (SELECT COUNT(*) FROM club_memberships cm WHERE cm.club_id = c.id AND cm.status = 'active') as member_count
+    FROM clubs c 
+    ORDER BY c.created_at DESC
+");
+$stmt->execute();
+$clubs = $stmt->fetchAll();
+
+$user_data = getUserData($pdo, $_SESSION['user_id']);
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campus Clubs - Dashboard</title>
+    <style>
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(to right, #f8f9fa, #e0eafc);
+            margin: 0;
+            padding: 0;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, #2575fc, #00c9ff);
+            color: white;
+            padding: 15px 0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .navbar-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+        }
+
+        .navbar h1 {
+            margin: 0;
+            font-size: 1.8em;
+        }
+
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .navbar-right a {
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            transition: background 0.3s;
+        }
+
+        .navbar-right a:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        h2 {
+            text-align: center;
+            color: #2575fc;
+            margin: 30px 0;
+        }
+
+        .clubs-wrapper {
+            overflow: hidden;
+            width: 100%;
+            margin: 50px 0;
+        }
+
+        @keyframes scroll {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+
+        .clubs-container {
+            display: flex;
+            flex-wrap: nowrap;  
+            justify-content: flex-start;
+            padding: 20px;
+            gap: 30px;
+            animation: scroll 40s linear infinite;
+            will-change: transform;
+            width: fit-content;
+        }
+
+        .clubs-container:hover {
+            animation-play-state: paused;
+        }
+
+        .club-card {
+            background: white;
+            border-radius: 18px;
+            width: 280px;
+            overflow: hidden;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .club-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 25px rgba(0,0,0,0.2);
+        }
+
+        .club-card img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            background: linear-gradient(45deg, #f0f0f0, #e0e0e0);
+        }
+
+        .club-card h3 {
+            margin: 15px 0 10px;
+            font-size: 1.3em;
+            color: #34495e;
+            text-align: center;
+            padding: 0 15px;
+        }
+
+        .club-card p {
+            color: #666;
+            padding: 0 20px;
+            font-size: 0.95em;
+            text-align: center;
+            line-height: 1.4;
+        }
+
+        .club-card .member-count {
+            text-align: center;
+            padding: 10px 20px 20px;
+            color: #2575fc;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 2% auto;
+            padding: 0;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+            animation: slideIn 0.3s;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, #2575fc, #00c9ff);
+            color: white;
+            padding: 30px;
+            border-radius: 20px 20px 0 0;
+            position: relative;
+        }
+
+        .close {
+            position: absolute;
+            top: 15px;
+            right: 25px;
+            color: white;
+            font-size: 35px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+
+        .close:hover {
+            color: #ffdddd;
+        }
+
+        .modal-body {
+            padding: 30px;
+        }
+
+        .club-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .club-details h3 {
+            color: #2575fc;
+            margin-bottom: 15px;
+            font-size: 1.4em;
+        }
+
+        .club-details p {
+            line-height: 1.6;
+            color: #555;
+            margin-bottom: 20px;
+        }
+
+        .club-stats {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 12px;
+            border-left: 4px solid #2575fc;
+        }
+
+        .stat-item {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .stat-label {
+            font-weight: 600;
+            color: #2575fc;
+            min-width: 80px;
+        }
+
+        .activities-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .activity-tag {
+            background: linear-gradient(135deg, #00c9ff, #92fe9d);
+            color: white;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+
+        .join-button {
+            background: linear-gradient(135deg, #00c9ff, #92fe9d);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 25px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: block;
+            margin: 20px auto 0;
+            text-decoration: none;
+            text-align: center;
+        }
+
+        .join-button:hover {
+            background: linear-gradient(135deg, #00b4db, #39e29d);
+            transform: translateY(-2px);
+        }
+
+        .join-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #666;
+        }
+
+        .alert {
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        @media (max-width: 768px) {
+            .navbar-content {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+            
+            .club-info {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .modal-content {
+                margin: 5% auto;
+                width: 95%;
+            }
+            
+            .modal-header, .modal-body {
+                padding: 20px;
+            }
+
+            .clubs-container {
+                animation: scroll 60s linear infinite;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-content">
+            <h1>🎓 Campus Clubs</h1>
+            <div class="navbar-right">
+                <span>Welcome, <?php echo htmlspecialchars($user_data['full_name']); ?>!</span>
+                <a href="my-clubs.php">My Clubs</a>
+                <a href="profile.php">Profile</a>
+                <a href="logout.php">Logout</a>
+            </div>
+        </div>
+    </nav>
+    
+    <div>
+        <h2>"Join Our Dynamic Campus Clubs and Make the Most of Your College Life"</h2>
+    </div>
+    
+    <div class="clubs-wrapper">
+        <div class="clubs-container" id="clubs-container">
+            <?php foreach($clubs as $club): ?>
+            <div class="club-card" data-club="<?php echo $club['id']; ?>">
+                <img src="<?php echo htmlspecialchars($club['image'] ?: 'images/default-club.jpg'); ?>" 
+                     alt="<?php echo htmlspecialchars($club['name']); ?>"
+                     onerror="this.src='images/default-club.jpg'">
+                <h3><?php echo htmlspecialchars($club['name']); ?></h3>
+                <p><?php echo htmlspecialchars($club['short_description']); ?></p>
+                <div class="member-count">👥 <?php echo $club['member_count']; ?> members</div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+
+    <!-- Modal for Club Details -->
+    <div id="clubModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="close">&times;</span>
+                <h2 id="modalClubName">Club Name</h2>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <div class="loading">Loading club details...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Duplicate content for infinite scroll
+        const container = document.getElementById('clubs-container');
+        const originalContent = container.innerHTML;
+        container.innerHTML += originalContent;
+
+        // Scroll animation
+        let scrollSpeed = 0.5;  
+        let currentScroll = 0;
+        let isScrolling = true;
+
+        function scroll() {
+            if (isScrolling) {
+                currentScroll += scrollSpeed;
+                if (currentScroll >= container.scrollWidth / 2) {
+                    currentScroll = 0;  
+                }
+                container.style.transform = `translateX(-${currentScroll}px)`;
+            }
+            requestAnimationFrame(scroll);
+        }
+        scroll();
+
+        // Pause scroll on hover
+        container.addEventListener('mouseenter', () => {
+            isScrolling = false;
+        });
+
+        container.addEventListener('mouseleave', () => {
+            isScrolling = true;
+        });
+
+        // Modal functionality
+        const modal = document.getElementById('clubModal');
+        const modalBody = document.getElementById('modalBody');
+        const modalClubName = document.getElementById('modalClubName');
+        const closeBtn = document.getElementsByClassName('close')[0];
+
+        // Add click event to all club cards
+        document.addEventListener('click', function(e) {
+            const clubCard = e.target.closest('.club-card');
+            if (clubCard) {
+                const clubId = clubCard.getAttribute('data-club');
+                openModal(clubId);
+            }
+        });
+
+        // Close modal events
+        closeBtn.onclick = function() {
+            modal.style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                modal.style.display = 'none';
+            }
+        });
+
+        function openModal(clubId) {
+            modal.style.display = 'block';
+            modalBody.innerHTML = '<div class="loading">Loading club details...</div>';
+            modalClubName.textContent = 'Loading...';
+
+            // Fetch club details via AJAX
+            fetch('clubs.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'action=get_club_details&club_id=' + clubId
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    modalBody.innerHTML = '<div class="alert alert-error">' + data.error + '</div>';
+                    return;
+                }
+                
+                modalClubName.textContent = data.name;
+                
+                let membershipStatus = '';
+                if (data.is_member === 'active') {
+                    membershipStatus = '<div class="alert alert-success">✅ You are an active member of this club!</div>';
+                } else if (data.is_member === 'pending') {
+                    membershipStatus = '<div class="alert alert-success">⏳ Your membership request is pending approval.</div>';
+                }
+                
+                modalBody.innerHTML = `
+                    ${membershipStatus}
+                    
+                    <div class="club-info">
+                        <div class="club-details">
+                            <h3>About ${data.name}</h3>
+                            <p>${data.full_description}</p>
+                            
+                            <h3>Club Activities</h3>
+                            <div class="activities-list">
+                                ${data.activities.map(activity => 
+                                    `<span class="activity-tag">${activity}</span>`
+                                ).join('')}
+                            </div>
+                        </div>
+                        
+                        <div class="club-stats">
+                            <h3>📋 Club Information</h3>
+                            <div class="stat-item">
+                                <span class="stat-label">👥 Members:</span>
+                                <span>${data.member_count} active members</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">📅 Meeting:</span>
+                                <span>${data.meeting_time}</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">📍 Location:</span>
+                                <span>${data.location}</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">📧 Contact:</span>
+                                <span>${data.contact_email}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    ${!data.is_member ? `
+                        <button class="join-button" onclick="joinClub(${clubId})">
+                            🎯 Join ${data.name} Now!
+                        </button>
+                    ` : ''}
+                `;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                modalBody.innerHTML = '<div class="alert alert-error">Error loading club details. Please try again.</div>';
+            });
+        }
+
+        function joinClub(clubId) {
+            const button = event.target;
+            button.disabled = true;
+            button.textContent = 'Joining...';
+
+            fetch('clubs.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'action=join_club&club_id=' + clubId
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    button.textContent = '✅ Request Submitted!';
+                    button.style.background = '#28a745';
+                    setTimeout(() => {
+                        modal.style.display = 'none';
+                        location.reload(); // Refresh to update member count
+                    }, 2000);
+                } else {
+                    button.disabled = false;
+                    button.textContent = 'Join Club';
+                    alert(data.error || 'Failed to join club');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                button.disabled = false;
+                button.textContent = 'Join Club';
+                alert('Error joining club. Please try again.');
+            });
+        }
+    </script>
+</body>
+</html>
+
+<?php
+// =====================================================
+// 6. MY CLUBS PAGE (my-clubs.php)
+// =====================================================
+?>
+
+<?php
+require_once 'config.php';
+requireLogin();
+
+// Fetch user's club memberships
+$stmt = $pdo->prepare("
+    SELECT c.*, cm.status, cm.role, cm.joined_at,
+           (SELECT COUNT(*) FROM club_memberships cm2 WHERE cm2.club_id = c.id AND cm2.status = 'active') as member_count
+    FROM club_memberships cm
+    JOIN clubs c ON cm.club_id = c.id
+    WHERE cm.user_id = ?
+    ORDER BY cm.joined_at DESC
+");
+$stmt->execute([$_SESSION['user_id']]);
+$my_clubs = $stmt->fetchAll();
+
+$user_data = getUserData($pdo, $_SESSION['user_id']);
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Clubs - Campus Clubs</title>
+    <style>
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(to right, #f8f9fa, #e0eafc);
+            margin: 0;
+            padding: 0;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, #2575fc, #00c9ff);
+            color: white;
+            padding: 15px 0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .navbar-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+        }
+
+        .navbar h1 {
+            margin: 0;
+            font-size: 1.8em;
+        }
+
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .navbar-right a {
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            transition: background 0.3s;
+        }
+
+        .navbar-right a:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        .page-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .page-header h1 {
+            color: #2575fc;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .page-header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .clubs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 30px;
+            margin-top: 30px;
+        }
+
+        .club-card {
+            background: white;
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .club-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 25px rgba(0,0,0,0.15);
+        }
+
+        .club-card img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            background: linear-gradient(45deg, #f0f0f0, #e0e0e0);
+        }
+
+        .club-card-content {
+            padding: 25px;
+        }
+
+        .club-card h3 {
+            margin: 0 0 15px 0;
+            font-size: 1.4em;
+            color: #34495e;
+        }
+
+        .club-card p {
+            color: #666;
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
+
+        .club-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-active {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .role-badge {
+            padding: 6px 12px;
+            border-radius: 15px;
+            background: linear-gradient(135deg, #2575fc, #00c9ff);
+            color: white;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+
+        .club-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #2575fc, #00c9ff);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .empty-state img {
+            width: 200px;
+            opacity: 0.5;
+            margin-bottom: 30px;
+        }
+
+        .empty-state h3 {
+            font-size: 1.5em;
+            margin-bottom: 15px;
+            color: #2575fc;
+        }
+
+        .empty-state p {
+            font-size: 1.1em;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .navbar-content {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+            
+            .clubs-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .club-meta {
+                flex-direction: column;
+                gap: 10px;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-content">
+            <h1>🎓 Campus Clubs</h1>
+            <div class="navbar-right">
+                <span>Welcome, <?php echo htmlspecialchars($user_data['full_name']); ?>!</span>
+                <a href="clubs.php">Browse Clubs</a>
+                <a href="profile.php">Profile</a>
+                <a href="logout.php">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <h1>My Clubs</h1>
+            <p>Manage your club memberships and stay connected with your communities</p>
+        </div>
+
+        <?php if (empty($my_clubs)): ?>
+        <div class="empty-state">
+            <h3>No Club Memberships Yet</h3>
+            <p>You haven't joined any clubs yet. Explore our amazing clubs and find your community!</p>
+            <a href="clubs.php" class="btn btn-primary">Browse All Clubs</a>
+        </div>
+        <?php else: ?>
+        <div class="clubs-grid">
+            <?php foreach($my_clubs as $club): ?>
+            <div class="club-card">
+                <img src="<?php echo htmlspecialchars($club['image'] ?: 'images/default-club.jpg'); ?>" 
+                     alt="<?php echo htmlspecialchars($club['name']); ?>"
+                     onerror="this.src='images/default-club.jpg'">
+                
+                <div class="club-card-content">
+                    <h3><?php echo htmlspecialchars($club['name']); ?></h3>
+                    <p><?php echo htmlspecialchars($club['short_description']); ?></p>
+                    
+                    <div class="club-meta">
+                        <div>
+                            <span class="status-badge status-<?php echo $club['status']; ?>">
+                                <?php echo ucfirst($club['status']); ?>
+                            </span>
+                            <span class="role-badge"><?php echo ucfirst($club['role']); ?></span>
+                        </div>
+                        <div style="text-align: right; color: #666; font-size: 0.9em;">
+                            <div>👥 <?php echo $club['member_count']; ?> members</div>
+                            <div>📅 Joined: <?php echo date('M d, Y', strtotime($club['joined_at'])); ?></div>
+                        </div>
+                    </div>
+                    
+                    <div class="club-actions">
+                        <a href="club-details.php?id=<?php echo $club['id']; ?>" class="btn btn-primary">
+                            View Details
+                        </a>
+                        <?php if ($club['status'] === 'active'): ?>
+                        <a href="club-events.php?id=<?php echo $club['id']; ?>" class="btn btn-primary">
+                            Events
+                        </a>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+    </div>
+</body>
+</html>
+
+<?php
+// =====================================================
+// 7. LOGOUT PAGE (logout.php)
+// =====================================================
+?>
+
+<?php
+session_start();
+session_destroy();
+header('Location: login.php');
+exit;
+?>
+
+<?php
+// =====================================================
+// 8. ADDITIONAL FILES STRUCTURE
+// =====================================================
+
+/*
+
+Additional files you should create:
+
+1. images/ folder with club images:
+   - default-club.jpg (default placeholder)
+   - literary.jpg, music.jpg, tech.jpg, etc.
+
+2. profile.php - User profile management
+3. club-details.php - Individual club page
+4. club-events.php - Club events management
+5. admin/ folder - Admin panel for club management
+
+Database permissions needed:
+- Create the database 'campus_clubs'
+- Run all the SQL CREATE TABLE statements
+- Insert the sample club data
+- Update DB_USER and DB_PASS in config.php
+
+File structure:
+/campus-clubs/
+├── config.php
+├── login.php
+├── register.php
+├── clubs.php (main clubs page)
+├── my-clubs.php
+├── logout.php
+├── profile.php
+├── club-details.php
+├── club-events.php
+├── images/
+│   ├── default-club.jpg
+│   ├── literary.jpg
+│   ├── music.jpg
+│   └── ... (other club images)
+└── admin/
+    ├── index.php
+    ├── manage-clubs.php
+    └── manage-users.php
+
+Installation steps:
+1. Create MySQL database 'campus_clubs'
+2. Run the SQL queries to create tables
+3. Update config.php with your database credentials
+4. Upload all PHP files to your web server
+5. Create images folder and add club images
+6. Access login.php to start using the system
+
+Features included:
+✅ User registration and authentication
+✅ Secure password hashing
+✅ Club browsing with animated carousel
+✅ Club details in modal popup
+✅ Join club functionality
+✅ My clubs dashboard
+✅ Membership status tracking
+✅ Responsive design
+✅ AJAX for smooth user experience
+✅ SQL injection protection
+✅ Error handling
+✅ Session management
+
+*/
+?>
